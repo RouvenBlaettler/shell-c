@@ -9,7 +9,7 @@ int main(int argc, char *argv[]) {
   char input[256];
 
   // TODO: Uncomment the code below to pass the first stage
-  while(input){
+  while(input != "exit"){
   printf("$ ");
   fgets(input,sizeof(input), stdin);
   input[strlen(input)-1] = '\0';
