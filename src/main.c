@@ -9,12 +9,15 @@ int main(int argc, char *argv[]) {
   char input[256];
 
   // TODO: Uncomment the code below to pass the first stage
-  while(input != "exit"){
   printf("$ ");
   fgets(input,sizeof(input), stdin);
   input[strlen(input)-1] = '\0';
-  printf("hhasahs");
+
+  while(strcmp(input, "exit")){
   printf("%s: command not found\n", input);
+  printf("$ ");
+  fgets(input,sizeof(input), stdin);
+  input[strlen(input)-1] = '\0';
   }
 
   return 0;
