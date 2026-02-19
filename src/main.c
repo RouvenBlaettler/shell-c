@@ -14,10 +14,24 @@ int main(int argc, char *argv[]) {
   input[strlen(input)-1] = '\0';
 
   while(strcmp(input, "exit")){
-  printf("%s: command not found\n", input);
-  printf("$ ");
-  fgets(input,sizeof(input), stdin);
-  input[strlen(input)-1] = '\0';
+    char *space = strchr(input, ' ');
+    if(space != NULL){
+      *space = '\0';
+      char *first = input;
+      char *rest = space + 1;
+      if(strstr(first, "echo")){
+        printf("%s\n", rest);
+      }
+      else{
+        printf("%s: command not found\n", input);
+      }
+    }
+    else{
+    printf("%s: command not found\n", input);
+    }
+    printf("$ ");
+    fgets(input,sizeof(input), stdin);
+    input[strlen(input)-1] = '\0';
   }
 
   return 0;
