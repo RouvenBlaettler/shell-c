@@ -29,7 +29,7 @@ int main(int argc, char *argv[]) {
       int tmp = 0;
       for(int i = 0; i<size; i++){
         if(strcmp(input + 5, commands[i]) == 0){
-          printf("%s is a shell built in\n", input + 5);
+          printf("%s is a shell builtin\n", input + 5);
           tmp++;
           }
         }
