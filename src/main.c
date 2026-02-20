@@ -34,7 +34,7 @@ int main(int argc, char *argv[]) {
           }
         }
       if(tmp == 0){
-      printf("%s: command not found\n", input + 5);
+      printf("%s: not found\n", input + 5);
       }
     }
     else{
