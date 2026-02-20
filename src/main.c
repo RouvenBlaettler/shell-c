@@ -9,29 +9,23 @@ int main(int argc, char *argv[]) {
   char input[256];
 
   // TODO: Uncomment the code below to pass the first stage
-  printf("$ ");
-  fgets(input,sizeof(input), stdin);
-  input[strlen(input)-1] = '\0';
+  
 
-  while(strcmp(input, "exit")){
-    char *space = strchr(input, ' ');
-    if(space != NULL){
-      *space = '\0';
-      char *first = input;
-      char *rest = space + 1;
-      if(strstr(first, "echo")){
-        printf("%s\n", rest);
-      }
-      else{
-        printf("%s: command not found\n", input);
-      }
-    }
-    else{
-    printf("%s: command not found\n", input);
-    }
+  while(1){
     printf("$ ");
     fgets(input,sizeof(input), stdin);
     input[strlen(input)-1] = '\0';
+
+    if(strcmp(input, "exit") == 0){
+      break;
+    }
+    else if(strncmp(input, "echo ", 5) == 0){
+      printf("%s\n", input + 5);
+
+    }
+    else{
+      printf("%s: command not found\n", input);
+    }
   }
 
   return 0;
