@@ -2,6 +2,9 @@
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
+#include <stdbool.h>
+
+char * check_if_executable(const char* cmd);
 
 
 int main(int argc, char *argv[]) {
@@ -33,40 +36,46 @@ int main(int argc, char *argv[]) {
         if(strcmp(cmd, commands[i]) == 0){
           printf("%s is a shell builtin\n", cmd);
           tmp++;
-          }
         }
+      }
       if(tmp == 0){
-        const char *path_env = getenv("PATH");
-        int found = 0;
-
-        if(path_env != NULL){
-          char *paths = strdup(path_env);
-          char *saveptr = NULL;
-
-          for(char *dir = strtok_r(paths, ":", &saveptr); dir != NULL; dir = strtok_r(NULL, ":", &saveptr)){
-            char full_path[512];
-            if(snprintf(full_path, sizeof(full_path), "%s/%s", dir, cmd) >= (int)sizeof(full_path)){
-              continue;
-            }
-            if(access(full_path, X_OK) == 0){
-              printf("%s is %s\n", cmd, full_path);
-              found = 1;
-              break;
-            }
-          }
-
-          free(paths);
+        char *result = check_if_executable(cmd);
+        if(result){
+          printf("%s is %s\n", cmd, result);
+          free(result);
         }
-
-        if(found == 0){
+        else{
           printf("%s: not found\n", cmd);
         }
       }
     }
     else{
       printf("%s: command not found\n", input);
-      }
     }
+  }
+        
 
   return 0;
 }
+char * check_if_executable(const char* cmd){
+  const char *path_env = getenv("PATH");
+
+  if(path_env != NULL){
+    char *paths = strdup(path_env);
+    char *saveptr = NULL;
+
+    for(char *dir = strtok_r(paths, ":", &saveptr); dir != NULL; dir = strtok_r(NULL, ":", &saveptr)){
+      char full_path[512];
+      if(snprintf(full_path, sizeof(full_path), "%s/%s", dir, cmd) >= (int)sizeof(full_path)){
+            continue;
+          }
+          if(access(full_path, X_OK) == 0){
+            free(paths);
+            return strdup(full_path);
+          }
+        }
+
+        free(paths);
+      }
+  return NULL;
+  }
