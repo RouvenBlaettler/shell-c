@@ -5,6 +5,8 @@
 #include <stdbool.h>
 
 char * check_if_executable(const char* cmd);
+char** tokenize_input(char* input);
+void free_tokens(char** tokens);
 
 
 int main(int argc, char *argv[]) {
@@ -15,22 +17,23 @@ int main(int argc, char *argv[]) {
 
   char commands[3][256] = {"exit", "echo", "type"};
   int size = sizeof(commands) / sizeof(commands[0]);
-  // TODO: Uncomment the code below to pass the first stage
 
   while(1){
     printf("$ ");
     fgets(input,sizeof(input), stdin);
     input[strlen(input)-1] = '\0';
 
-    if(strcmp(input, "exit") == 0){
+    char** tokens = tokenize_input(input);
+
+    if(strcmp(tokens[0], "exit") == 0){
       break;
     }
-    else if(strncmp(input, "echo ", 5) == 0){
+    else if(strcmp(tokens[0], "echo") == 0){
       printf("%s\n", input + 5);
 
     }
-    else if(strncmp(input, "type ", 5) == 0){
-      const char *cmd = input + 5;
+    else if(strcmp(tokens[0], "type") == 0){
+      const char *cmd = tokens[1];
       int tmp = 0;
       for(int i = 0; i<size; i++){
         if(strcmp(cmd, commands[i]) == 0){
@@ -49,6 +52,9 @@ int main(int argc, char *argv[]) {
         }
       }
     }
+    else if(check_if_executable(tokens[0])){
+      system(input);
+    }
     else{
       printf("%s: command not found\n", input);
     }
@@ -57,6 +63,8 @@ int main(int argc, char *argv[]) {
 
   return 0;
 }
+
+
 char * check_if_executable(const char* cmd){
   const char *path_env = getenv("PATH");
 
@@ -79,3 +87,27 @@ char * check_if_executable(const char* cmd){
       }
   return NULL;
   }
+
+
+  char** tokenize_input(char* input){
+    char** tokens = malloc(64 * sizeof(char*));
+    int count = 0;
+
+    char* input_copy = strdup(input);
+    char* saveptr = NULL;
+
+    for(char* token = strtok_r(input_copy, " ", &saveptr); token != NULL; token = strtok_r(NULL, " ", &saveptr)){
+      tokens[count++] = strdup(token);
+    }
+    tokens[count] = NULL;
+
+    free(input_copy);
+    return tokens;
+  }
+
+  void free_tokens(char** tokens) {
+    for(int i = 0; tokens[i] != NULL; i++) {
+        free(tokens[i]);
+    }
+    free(tokens);
+}
