@@ -15,7 +15,7 @@ int main(int argc, char *argv[]) {
 
   char input[256];
 
-  char commands[3][256] = {"exit", "echo", "type"};
+  char commands[4][256] = {"exit", "echo", "type", "pwd"};
   int size = sizeof(commands) / sizeof(commands[0]);
 
   while(1){
@@ -51,6 +51,16 @@ int main(int argc, char *argv[]) {
           printf("%s: not found\n", cmd);
         }
       }
+    }
+    else if(strcmp(tokens[0], "pwd") == 0){
+      char cwd[1024];
+      if(getcwd(cwd, sizeof(cwd)) != NULL){
+      printf("%s\n", cwd);
+      }
+      else{
+        perror("pwd");
+      }
+
     }
     else if(check_if_executable(tokens[0])){
       system(input);
