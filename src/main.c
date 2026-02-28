@@ -66,7 +66,7 @@ int main(int argc, char *argv[]) {
     }
     else if(strcmp(tokens[0], "cd") == 0){
       if(tokens[1] && chdir(tokens[1]) != 0){
-        printf("cd: %s: No such file or directoy\n", tokens[1]);
+        printf("cd: %s: No such file or directory\n", tokens[1]);
       }
     }
 
