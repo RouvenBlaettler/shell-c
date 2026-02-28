@@ -3,6 +3,8 @@
 #include <string.h>
 #include <unistd.h>
 #include <stdbool.h>
+#include <sys/wait.h>
+
 
 char * check_if_executable(const char* cmd);
 char** tokenize_input(char* input);
@@ -15,7 +17,7 @@ int main(int argc, char *argv[]) {
 
   char input[256];
 
-  char commands[4][256] = {"exit", "echo", "type", "pwd"};
+  char commands[5][256] = {"exit", "echo", "type", "pwd", "cd"};
   int size = sizeof(commands) / sizeof(commands[0]);
 
   while(1){
@@ -62,9 +64,16 @@ int main(int argc, char *argv[]) {
       }
 
     }
+    else if(strcmp(tokens[0], "cd") == 0){
+      if(tokens[1] && chdir(tokens[1]) != 0){
+        printf("cd: %s: No such file or directoy\n", tokens[1]);
+      }
+    }
+
     else if(check_if_executable(tokens[0])){
       system(input);
     }
+    
     else{
       printf("%s: command not found\n", input);
     }
