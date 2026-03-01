@@ -65,7 +65,10 @@ int main(int argc, char *argv[]) {
 
     }
     else if(strcmp(tokens[0], "cd") == 0){
-      if(tokens[1] && chdir(tokens[1]) != 0){
+      if(strcmp(tokens[1], "~") == 0){
+        chdir(getenv("HOME"));
+      }
+      else if(tokens[1] && chdir(tokens[1]) != 0){
         printf("cd: %s: No such file or directory\n", tokens[1]);
       }
     }
