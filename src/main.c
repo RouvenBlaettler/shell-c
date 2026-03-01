@@ -18,7 +18,7 @@ int main(int argc, char *argv[]) {
 
   char input[256];
 
-  char commands[5][256] = {"exit", "echo", "type", "pwd", "cd"};
+  char commands[6][256] = {"exit", "echo", "type", "pwd", "cd", "ls"};
   int size = sizeof(commands) / sizeof(commands[0]);
 
   while(1){
