@@ -4,6 +4,7 @@
 #include <unistd.h>
 #include <stdbool.h>
 #include <sys/wait.h>
+#include <dirent.h>
 
 
 char * check_if_executable(const char* cmd);
@@ -71,6 +72,22 @@ int main(int argc, char *argv[]) {
       else if(tokens[1] && chdir(tokens[1]) != 0){
         printf("cd: %s: No such file or directory\n", tokens[1]);
       }
+    }
+
+    else if(strcmp(tokens[0], "ls")== 0){
+      int tmp = 0;
+      DIR *dir = opendir(".");
+      struct dirent *entry;
+      while ((entry = readdir(dir)) != NULL){
+        if(entry->d_name[0]=='.') continue;
+        tmp += 1;
+        printf("%s      ", entry->d_name);
+        if(tmp%3 == 0){
+          printf("\n");
+        }
+      }
+      printf("\n");
+      closedir(dir);
     }
 
     else if(check_if_executable(tokens[0])){
