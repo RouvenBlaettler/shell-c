@@ -97,7 +97,9 @@ int main(int argc, char *argv[]) {
     else{
       printf("%s: command not found\n", input);
     }
+    free_tokens(tokens);
   }
+  
         
 
   return 0;
