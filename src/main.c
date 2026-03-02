@@ -27,8 +27,11 @@ int main(int argc, char *argv[]) {
     input[strlen(input)-1] = '\0';
 
     char** tokens = tokenize_input(input);
+    if(tokens[0]==NULL){
+      continue;
+    }
 
-    if(strcmp(tokens[0], "exit") == 0){
+    else if(strcmp(tokens[0], "exit") == 0){
       break;
     }
     else if(strcmp(tokens[0], "echo") == 0){
@@ -38,6 +41,9 @@ int main(int argc, char *argv[]) {
     else if(strcmp(tokens[0], "type") == 0){
       const char *cmd = tokens[1];
       int tmp = 0;
+      if(tokens[1] == NULL){
+        continue;
+      }
       for(int i = 0; i<size; i++){
         if(strcmp(cmd, commands[i]) == 0){
           printf("%s is a shell builtin\n", cmd);
@@ -66,7 +72,7 @@ int main(int argc, char *argv[]) {
 
     }
     else if(strcmp(tokens[0], "cd") == 0){
-      if(strcmp(tokens[1], "~") == 0){
+      if(tokens[1] == NULL || strcmp(tokens[1], "~") == 0){
         chdir(getenv("HOME"));
       }
       else if(tokens[1] && chdir(tokens[1]) != 0){
