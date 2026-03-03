@@ -96,13 +96,25 @@ int main(int argc, char *argv[]) {
       closedir(dir);
     }
 
-    else if(check_if_executable(tokens[0])){
-      system(input);
+    else{
+      char* path = check_if_executable(tokens[0]);
+      if(path){
+        pid_t pid = fork();
+        if(pid == 0){
+          execv(path, tokens);
+          perror("exec");
+          exit(1);
+        }
+        else{
+          waitpid(pid, NULL, 0);
+        }
+        free(path);
+      }
+      else{
+      printf("%s: command not found\n", input);
+      }
     }
     
-    else{
-      printf("%s: command not found\n", input);
-    }
     free_tokens(tokens);
   }
   
