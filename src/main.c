@@ -11,6 +11,7 @@
 char * check_if_executable(const char* cmd);
 char** tokenize_input(char* input);
 void free_tokens(char** tokens);
+int token_count(char** tokens);
 
 
 int main(int argc, char *argv[]) {
@@ -24,15 +25,27 @@ int main(int argc, char *argv[]) {
 
   while(1){
     printf("$ ");
-    fgets(input,sizeof(input), stdin);
-    input[strlen(input)-1] = '\0';
+    if (fgets(input, sizeof(input), stdin) == NULL) {
+      break;
+    }
+    input[strcspn(input, "\n")] = '\0';
 
     char** tokens = tokenize_input(input);
+    int token_amount = token_count(tokens);
     if(tokens[0]==NULL){
+      free_tokens(tokens);
       continue;
     }
+    int redirect_index = -1;
+    for(int i = 0; i < token_amount; i++){
+      if(strcmp(tokens[i], ">") == 0 || strcmp(tokens[i], "1>") == 0){
+        redirect_index = i;
+        break;
+      }
+    }
 
-    else if(strcmp(tokens[0], "exit") == 0){
+    if(strcmp(tokens[0], "exit") == 0){
+      free_tokens(tokens);
       break;
     }
     else if(strcmp(tokens[0], "echo") == 0){
@@ -43,6 +56,7 @@ int main(int argc, char *argv[]) {
       const char *cmd = tokens[1];
       int tmp = 0;
       if(tokens[1] == NULL){
+        free_tokens(tokens);
         continue;
       }
       for(int i = 0; i<size; i++){
@@ -151,33 +165,33 @@ char * check_if_executable(const char* cmd){
   }
 
 
-  char** tokenize_input(char* input){
-    char** tokens = malloc(64 * sizeof(char*));
-    int count = 0;
+char** tokenize_input(char* input){
+  char** tokens = malloc(64 * sizeof(char*));
+  int count = 0;
 
-    char* input_copy = strdup(input);
-    char* saveptr = NULL;
+  char* input_copy = strdup(input);
+  char* saveptr = NULL;
 
-    for(char* token = strtok_r(input_copy, " ", &saveptr); token != NULL; token = strtok_r(NULL, " ", &saveptr)){
-      tokens[count++] = strdup(token);
-    }
-    tokens[count] = NULL;
-
-    free(input_copy);
-    return tokens;
+  for(char* token = strtok_r(input_copy, " ", &saveptr); token != NULL; token = strtok_r(NULL, " ", &saveptr)){
+    tokens[count++] = strdup(token);
   }
+  tokens[count] = NULL;
 
-  int token_count(char** tokens){
-    int n = 0;
-    while(tokens[n] != NULL){
-      n++;
-    }
-    return n;
+  free(input_copy);
+  return tokens;
+}
+
+int token_count(char** tokens){
+  int n = 0;
+  while(tokens[n] != NULL){
+    n++;
   }
+  return n;
+}
 
-  void free_tokens(char** tokens) {
-    for(int i = 0; tokens[i] != NULL; i++) {
-        free(tokens[i]);
-    }
-    free(tokens);
+void free_tokens(char** tokens) {
+  for(int i = 0; tokens[i] != NULL; i++) {
+      free(tokens[i]);
+  }
+  free(tokens);
 }
