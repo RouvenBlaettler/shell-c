@@ -5,6 +5,7 @@
 #include <stdbool.h>
 #include <sys/wait.h>
 #include <dirent.h>
+#include <fcntl.h>
 
 
 char * check_if_executable(const char* cmd);
@@ -127,9 +128,11 @@ int main(int argc, char *argv[]) {
 char * check_if_executable(const char* cmd){
   const char *path_env = getenv("PATH");
 
+
   if(path_env != NULL){
     char *paths = strdup(path_env);
     char *saveptr = NULL;
+
 
     for(char *dir = strtok_r(paths, ":", &saveptr); dir != NULL; dir = strtok_r(NULL, ":", &saveptr)){
       char full_path[512];
@@ -162,6 +165,14 @@ char * check_if_executable(const char* cmd){
 
     free(input_copy);
     return tokens;
+  }
+
+  int token_count(char** tokens){
+    int n = 0;
+    while(tokens[n] != NULL){
+      n++;
+    }
+    return n;
   }
 
   void free_tokens(char** tokens) {
