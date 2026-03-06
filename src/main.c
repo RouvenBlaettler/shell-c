@@ -37,19 +37,35 @@ int main(int argc, char *argv[]) {
       continue;
     }
     int redirect_index = -1;
+    char *redirect_file = NULL;
     for(int i = 0; i < token_amount; i++){
       if(strcmp(tokens[i], ">") == 0 || strcmp(tokens[i], "1>") == 0){
         redirect_index = i;
+        if(redirect_index + 1 < token_amount){
+          redirect_file = tokens[redirect_index + 1];
+          tokens[redirect_index] = NULL; // Terminate command args before redirect
+        }
         break;
       }
     }
+    
 
     if(strcmp(tokens[0], "exit") == 0){
       free_tokens(tokens);
       break;
     }
     else if(strcmp(tokens[0], "echo") == 0){
+      int fd = -1;
+      if(redirect_file){
+        fd = open(redirect_file, O_WRONLY | O_CREAT | O_TRUNC, 0644);
+        if(fd != -1){
+          dup2(fd, STDOUT_FILENO);
+        }
+      }
       printf("%s\n", input + 5);
+      if(fd != -1){
+        close(fd);
+      }
 
     }
     else if(strcmp(tokens[0], "type") == 0){
@@ -102,6 +118,13 @@ int main(int argc, char *argv[]) {
       if(path){
         pid_t pid = fork();
         if(pid == 0){
+          if(redirect_file){
+            int fd = open(redirect_file, O_WRONLY | O_CREAT | O_TRUNC, 0644);
+            if(fd != -1){
+              dup2(fd, STDOUT_FILENO);
+              close(fd);
+            }
+          }
           execv(path, tokens);
           perror("exec");
           exit(1);
@@ -116,13 +139,16 @@ int main(int argc, char *argv[]) {
       }
     }
     
-    free_tokens(tokens);
+  free_tokens(tokens);
   }
+  
+  return 0;
+}
   
         
 
-  return 0;
-}
+  
+
 
 
 char * check_if_executable(const char* cmd){
