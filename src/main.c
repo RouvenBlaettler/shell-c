@@ -65,7 +65,10 @@ int main(int argc, char *argv[]) {
           close(fd);
         }
       }
-      printf("%s\n", input + 5);
+      for(int i = 1; tokens[i] != NULL; i++){
+        printf("%s ", tokens[i]);
+      }
+      printf("\n");
       if(saved_stdout != -1){
         dup2(saved_stdout, STDOUT_FILENO);  // Restore original stdout
         close(saved_stdout);
