@@ -56,15 +56,19 @@ int main(int argc, char *argv[]) {
     }
     else if(strcmp(tokens[0], "echo") == 0){
       int fd = -1;
+      int saved_stdout = -1;
       if(redirect_file){
         fd = open(redirect_file, O_WRONLY | O_CREAT | O_TRUNC, 0644);
         if(fd != -1){
+          saved_stdout = dup(STDOUT_FILENO);  // Save original stdout
           dup2(fd, STDOUT_FILENO);
+          close(fd);
         }
       }
       printf("%s\n", input + 5);
-      if(fd != -1){
-        close(fd);
+      if(saved_stdout != -1){
+        dup2(saved_stdout, STDOUT_FILENO);  // Restore original stdout
+        close(saved_stdout);
       }
 
     }
