@@ -20,7 +20,7 @@ int main(int argc, char *argv[]) {
 
   char input[256];
 
-  char commands[6][256] = {"exit", "echo", "type", "pwd", "cd", "ls"};
+  char commands[6][256] = {"exit", "echo", "type", "pwd", "cd"};
   int size = sizeof(commands) / sizeof(commands[0]);
 
   while(1){
@@ -95,21 +95,7 @@ int main(int argc, char *argv[]) {
       }
     }
 
-    else if(strcmp(tokens[0], "ls")== 0){
-      int tmp = 0;
-      DIR *dir = opendir(".");
-      struct dirent *entry;
-      while ((entry = readdir(dir)) != NULL){
-        if(entry->d_name[0]=='.') continue;
-        tmp += 1;
-        printf("%s      ", entry->d_name);
-        if(tmp%3 == 0){
-          printf("\n");
-        }
-      }
-      printf("\n");
-      closedir(dir);
-    }
+    
 
     else{
       char* path = check_if_executable(tokens[0]);
