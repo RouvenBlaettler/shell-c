@@ -1,0 +1,7 @@
+main
+main.c
+output.txt
+main
+main.c
+output.txt
+cat: nonexistent: No such file or directory

@@ -39,6 +39,7 @@ int main(int argc, char *argv[]) {
     int redirect_index = -1;
     char *redirect_file = NULL;
     int fileNum;
+    bool append_output = false;
     for(int i = 0; i < token_amount; i++){
       if(strcmp(tokens[i], ">") == 0 || strcmp(tokens[i], "1>") == 0){
         redirect_index = i;
@@ -58,6 +59,26 @@ int main(int argc, char *argv[]) {
         }
         break;
       }
+      else if(strcmp(tokens[i], ">>")==0 || strcmp(tokens[i], "1>>")==0){
+        redirect_index = i;
+        if(redirect_index + 1 < token_amount){
+          redirect_file = tokens[redirect_index + 1];
+          tokens[redirect_index] = NULL; // Terminate command args before redirect
+          fileNum = 1;
+          append_output = true;
+        }
+        break;
+      }
+      else if(strcmp(tokens[i], "2>>")==0){
+        redirect_index = i;
+        if(redirect_index + 1 < token_amount){
+          redirect_file = tokens[redirect_index + 1];
+          tokens[redirect_index] = NULL; // Terminate command args before redirect
+          fileNum = 2;
+          append_output = true;
+        }
+        break;
+      }
     }
     
 
@@ -68,12 +89,20 @@ int main(int argc, char *argv[]) {
     else if(strcmp(tokens[0], "echo") == 0){
       int fd = -1;
       int saved_stdout = -1;
-      if(redirect_file){
-        fd = open(redirect_file, O_WRONLY | O_CREAT | O_TRUNC, 0644);
+      if(redirect_file && append_output){
+        fd = open(redirect_file, O_WRONLY | O_CREAT | O_APPEND, 0644);
         if(fd != -1){
           saved_stdout = dup(fileNum);  // Save original stdout
           dup2(fd, fileNum);
           close(fd);
+        }
+      }
+      else if(redirect_file){
+            int fd = open(redirect_file, O_WRONLY | O_CREAT | O_TRUNC, 0644);
+            if(fd != -1){
+              saved_stdout = dup(fileNum);
+              dup2(fd, fileNum);
+              close(fd);
         }
       }
       for(int i = 1; tokens[i] != NULL; i++){
@@ -136,7 +165,14 @@ int main(int argc, char *argv[]) {
       if(path){
         pid_t pid = fork();
         if(pid == 0){
-          if(redirect_file){
+          if(redirect_file && append_output){
+            int fd = open(redirect_file, O_WRONLY | O_CREAT | O_APPEND, 0644);
+            if(fd != -1){
+              dup2(fd, fileNum);
+              close(fd);
+            }
+          }
+          else if(redirect_file){
             int fd = open(redirect_file, O_WRONLY | O_CREAT | O_TRUNC, 0644);
             if(fd != -1){
               dup2(fd, fileNum);
