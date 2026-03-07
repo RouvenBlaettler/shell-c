@@ -38,12 +38,23 @@ int main(int argc, char *argv[]) {
     }
     int redirect_index = -1;
     char *redirect_file = NULL;
+    int fileNum;
     for(int i = 0; i < token_amount; i++){
       if(strcmp(tokens[i], ">") == 0 || strcmp(tokens[i], "1>") == 0){
         redirect_index = i;
         if(redirect_index + 1 < token_amount){
           redirect_file = tokens[redirect_index + 1];
           tokens[redirect_index] = NULL; // Terminate command args before redirect
+          fileNum = 1;
+        }
+        break;
+      }
+      else if(strcmp(tokens[i], "2>")==0){
+        redirect_index = i;
+        if(redirect_index + 1 < token_amount){
+          redirect_file = tokens[redirect_index + 1];
+          tokens[redirect_index] = NULL; // Terminate command args before redirect
+          fileNum = 2;
         }
         break;
       }
@@ -60,8 +71,8 @@ int main(int argc, char *argv[]) {
       if(redirect_file){
         fd = open(redirect_file, O_WRONLY | O_CREAT | O_TRUNC, 0644);
         if(fd != -1){
-          saved_stdout = dup(STDOUT_FILENO);  // Save original stdout
-          dup2(fd, STDOUT_FILENO);
+          saved_stdout = dup(fileNum);  // Save original stdout
+          dup2(fd, fileNum);
           close(fd);
         }
       }
@@ -70,7 +81,7 @@ int main(int argc, char *argv[]) {
       }
       printf("\n");
       if(saved_stdout != -1){
-        dup2(saved_stdout, STDOUT_FILENO);  // Restore original stdout
+        dup2(saved_stdout, fileNum);  // Restore original stdout
         close(saved_stdout);
       }
 
@@ -128,7 +139,7 @@ int main(int argc, char *argv[]) {
           if(redirect_file){
             int fd = open(redirect_file, O_WRONLY | O_CREAT | O_TRUNC, 0644);
             if(fd != -1){
-              dup2(fd, STDOUT_FILENO);
+              dup2(fd, fileNum);
               close(fd);
             }
           }
