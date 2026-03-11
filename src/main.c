@@ -14,14 +14,29 @@ void free_tokens(char** tokens);
 int token_count(char** tokens);
 
 
+typedef struct {
+  bool has_redirection;
+  int target_fd;
+  bool append;
+  char *file;
+  int saved_fd;
+} Redirection;
+
+int parse_redirection(char **tokens, Redirection *r, int token_amount);
+int apply_redirection(Redirection *r, bool save_for_restore);
+
+
 int main(int argc, char *argv[]) {
   // Flush after every printf
   setbuf(stdout, NULL);
 
   char input[256];
 
-  char commands[6][256] = {"exit", "echo", "type", "pwd", "cd"};
+  char commands[5][256] = {"exit", "echo", "type", "pwd", "cd"};
   int size = sizeof(commands) / sizeof(commands[0]);
+
+  Redirection redir;
+  Redirection  *r = &redir;
 
   while(1){
     printf("$ ");
@@ -36,82 +51,34 @@ int main(int argc, char *argv[]) {
       free_tokens(tokens);
       continue;
     }
-    int redirect_index = -1;
-    char *redirect_file = NULL;
-    int fileNum;
-    bool append_output = false;
-    for(int i = 0; i < token_amount; i++){
-      if(strcmp(tokens[i], ">") == 0 || strcmp(tokens[i], "1>") == 0){
-        redirect_index = i;
-        if(redirect_index + 1 < token_amount){
-          redirect_file = tokens[redirect_index + 1];
-          tokens[redirect_index] = NULL; // Terminate command args before redirect
-          fileNum = 1;
-        }
-        break;
-      }
-      else if(strcmp(tokens[i], "2>")==0){
-        redirect_index = i;
-        if(redirect_index + 1 < token_amount){
-          redirect_file = tokens[redirect_index + 1];
-          tokens[redirect_index] = NULL; // Terminate command args before redirect
-          fileNum = 2;
-        }
-        break;
-      }
-      else if(strcmp(tokens[i], ">>")==0 || strcmp(tokens[i], "1>>")==0){
-        redirect_index = i;
-        if(redirect_index + 1 < token_amount){
-          redirect_file = tokens[redirect_index + 1];
-          tokens[redirect_index] = NULL; // Terminate command args before redirect
-          fileNum = 1;
-          append_output = true;
-        }
-        break;
-      }
-      else if(strcmp(tokens[i], "2>>")==0){
-        redirect_index = i;
-        if(redirect_index + 1 < token_amount){
-          redirect_file = tokens[redirect_index + 1];
-          tokens[redirect_index] = NULL; // Terminate command args before redirect
-          fileNum = 2;
-          append_output = true;
-        }
-        break;
-      }
-    }
-    
 
+    if (parse_redirection(tokens, r, token_amount) != 0) {
+      free_tokens(tokens);
+      continue;
+    }
+    bool save_for_restore;
+    
+    
     if(strcmp(tokens[0], "exit") == 0){
       free_tokens(tokens);
       break;
     }
     else if(strcmp(tokens[0], "echo") == 0){
-      int fd = -1;
-      int saved_stdout = -1;
-      if(redirect_file && append_output){
-        fd = open(redirect_file, O_WRONLY | O_CREAT | O_APPEND, 0644);
-        if(fd != -1){
-          saved_stdout = dup(fileNum);  // Save original stdout
-          dup2(fd, fileNum);
-          close(fd);
-        }
-      }
-      else if(redirect_file){
-            int fd = open(redirect_file, O_WRONLY | O_CREAT | O_TRUNC, 0644);
-            if(fd != -1){
-              saved_stdout = dup(fileNum);
-              dup2(fd, fileNum);
-              close(fd);
-        }
+      save_for_restore = true;
+      if (apply_redirection(r, save_for_restore) != 0) {
+        free_tokens(tokens);
+        continue;
       }
       for(int i = 1; tokens[i] != NULL; i++){
         printf("%s ", tokens[i]);
       }
       printf("\n");
-      if(saved_stdout != -1){
-        dup2(saved_stdout, fileNum);  // Restore original stdout
-        close(saved_stdout);
+      if(r->saved_fd != -1){
+        if (dup2(r->saved_fd, r->target_fd) == -1) {
+          perror("dup2");
+        }
+        close(r->saved_fd);
+        r->saved_fd = -1;
       }
 
     }
@@ -163,29 +130,20 @@ int main(int argc, char *argv[]) {
     else{
       char* path = check_if_executable(tokens[0]);
       if(path){
+        save_for_restore = false;
         pid_t pid = fork();
         if(pid == 0){
-          if(redirect_file && append_output){
-            int fd = open(redirect_file, O_WRONLY | O_CREAT | O_APPEND, 0644);
-            if(fd != -1){
-              dup2(fd, fileNum);
-              close(fd);
-            }
-          }
-          else if(redirect_file){
-            int fd = open(redirect_file, O_WRONLY | O_CREAT | O_TRUNC, 0644);
-            if(fd != -1){
-              dup2(fd, fileNum);
-              close(fd);
-            }
-          }
-          execv(path, tokens);
-          perror("exec");
+        if (apply_redirection(r, save_for_restore) != 0) {
           exit(1);
+        }
+        execv(path, tokens);
+        perror("exec");
+        exit(1);
         }
         else{
           waitpid(pid, NULL, 0);
         }
+        
         free(path);
       }
       else{
@@ -261,3 +219,79 @@ void free_tokens(char** tokens) {
   }
   free(tokens);
 }
+
+  
+int parse_redirection(char **tokens, Redirection *r, int token_amount) {
+
+  r->has_redirection = false;
+  r->target_fd = 1;
+  r->append = false;
+  r->file = NULL;
+  r->saved_fd = -1;
+
+  for (int i = 0; i < token_amount; i++) {
+    int target_fd = -1;
+    bool append = false;
+
+    if (strcmp(tokens[i], ">") == 0 || strcmp(tokens[i], "1>") == 0) {
+      target_fd = 1; append = false;
+    } else if (strcmp(tokens[i], "2>") == 0) {
+      target_fd = 2; append = false;
+    } else if (strcmp(tokens[i], ">>") == 0 || strcmp(tokens[i], "1>>") == 0) {
+      target_fd = 1; append = true;
+    } else if (strcmp(tokens[i], "2>>") == 0) {
+      target_fd = 2; append = true;
+    } else {
+      continue;
+    }
+
+    if (i + 1 >= token_amount || tokens[i + 1] == NULL) {
+      fprintf(stderr, "syntax error: expected file after redirection\n");
+      return -1;
+    }
+
+    r->has_redirection = true;
+    r->target_fd = target_fd;
+    r->append = append;
+    r->file = tokens[i + 1];
+    tokens[i] = NULL;
+    return 0;
+  }
+
+  return 0;
+}
+
+int apply_redirection(Redirection *r, bool save_for_restore){
+  if (!r->has_redirection) {
+    return 0;
+  }
+
+  int flags = O_WRONLY | O_CREAT | (r->append ? O_APPEND : O_TRUNC);
+  int fd = open(r->file, flags, 0644);
+  if (fd == -1) {
+    perror("open");
+    return -1;
+  }
+
+  if (save_for_restore) {
+    r->saved_fd = dup(r->target_fd);
+    if (r->saved_fd == -1) {
+      perror("dup");
+      close(fd);
+      return -1;
+    }
+  }
+
+  if (dup2(fd, r->target_fd) == -1) {
+    perror("dup2");
+    close(fd);
+    return -1;
+  }
+
+  close(fd);
+  return 0;
+}
+
+
+      
+  
