@@ -4,7 +4,6 @@
 #include <unistd.h>
 #include <stdbool.h>
 #include <sys/wait.h>
-#include <dirent.h>
 #include <fcntl.h>
 
 
@@ -22,8 +21,34 @@ typedef struct {
   int saved_fd;
 } Redirection;
 
+typedef int (*CmdFn)(char **tokens, Redirection *r);
+
+typedef struct {
+  const char *name;
+  CmdFn function;
+} Builtin;
+
+int exit_fn(char** tokens, Redirection *r);
+int echo_fn(char** tokens, Redirection *r);
+int type_fn(char** tokens, Redirection *r);
+int cd_fn(char** tokens, Redirection *r);
+int pwd_fn(char** tokens, Redirection *r);
+
 int parse_redirection(char **tokens, Redirection *r, int token_amount);
 int apply_redirection(Redirection *r, bool save_for_restore);
+const Builtin *find_builtin(const char *cmd, const Builtin *builtins, int count);
+
+
+Builtin builtins[] = {
+    {"exit", exit_fn},
+    {"echo", echo_fn},
+    {"type", type_fn},
+    {"pwd", pwd_fn},
+    {"cd", cd_fn},
+  };
+
+int amount_builtins = sizeof(builtins) / sizeof(builtins[0]);
+
 
 
 int main(int argc, char *argv[]) {
@@ -32,9 +57,7 @@ int main(int argc, char *argv[]) {
 
   char input[256];
 
-  char commands[5][256] = {"exit", "echo", "type", "pwd", "cd"};
-  int size = sizeof(commands) / sizeof(commands[0]);
-
+  
   Redirection redir;
   Redirection  *r = &redir;
 
@@ -57,99 +80,37 @@ int main(int argc, char *argv[]) {
       continue;
     }
     bool save_for_restore;
-    
-    
-    if(strcmp(tokens[0], "exit") == 0){
+
+    const Builtin *b = find_builtin(tokens[0], builtins, amount_builtins);
+    if (b != NULL) {
+      int rc = b->function(tokens, r);
       free_tokens(tokens);
-      break;
+      if (rc == 1) break;   // optional exit code convention
+      continue;
     }
-    else if(strcmp(tokens[0], "echo") == 0){
-      save_for_restore = true;
-      if (apply_redirection(r, save_for_restore) != 0) {
-        free_tokens(tokens);
-        continue;
-      }
-      for(int i = 1; tokens[i] != NULL; i++){
-        printf("%s ", tokens[i]);
-      }
-      printf("\n");
-      if(r->saved_fd != -1){
-        if (dup2(r->saved_fd, r->target_fd) == -1) {
-          perror("dup2");
-        }
-        close(r->saved_fd);
-        r->saved_fd = -1;
-      }
-
-    }
-    else if(strcmp(tokens[0], "type") == 0){
-      const char *cmd = tokens[1];
-      int tmp = 0;
-      if(tokens[1] == NULL){
-        free_tokens(tokens);
-        continue;
-      }
-      for(int i = 0; i<size; i++){
-        if(strcmp(cmd, commands[i]) == 0){
-          printf("%s is a shell builtin\n", cmd);
-          tmp++;
-        }
-      }
-      if(tmp == 0){
-        char *result = check_if_executable(cmd);
-        if(result){
-          printf("%s is %s\n", cmd, result);
-          free(result);
-        }
-        else{
-          printf("%s: not found\n", cmd);
-        }
-      }
-    }
-    else if(strcmp(tokens[0], "pwd") == 0){
-      char cwd[1024];
-      if(getcwd(cwd, sizeof(cwd)) != NULL){
-      printf("%s\n", cwd);
-      }
-      else{
-        perror("pwd");
-      }
-
-    }
-    else if(strcmp(tokens[0], "cd") == 0){
-      if(tokens[1] == NULL || strcmp(tokens[1], "~") == 0){
-        chdir(getenv("HOME"));
-      }
-      else if(tokens[1] && chdir(tokens[1]) != 0){
-        printf("cd: %s: No such file or directory\n", tokens[1]);
-      }
-    }
-
     
 
-    else{
-      char* path = check_if_executable(tokens[0]);
-      if(path){
-        save_for_restore = false;
-        pid_t pid = fork();
-        if(pid == 0){
-        if (apply_redirection(r, save_for_restore) != 0) {
-          exit(1);
-        }
-        execv(path, tokens);
-        perror("exec");
+    char* path = check_if_executable(tokens[0]);
+    if(path){
+      save_for_restore = false;
+      pid_t pid = fork();
+      if(pid == 0){
+      if (apply_redirection(r, save_for_restore) != 0) {
         exit(1);
-        }
-        else{
-          waitpid(pid, NULL, 0);
-        }
-        
-        free(path);
+      }
+      execv(path, tokens);
+      perror("exec");
+      exit(1);
       }
       else{
-      printf("%s: command not found\n", input);
+        waitpid(pid, NULL, 0);
       }
+      
+      free(path);
+      free_tokens(tokens);
+      continue;
     }
+    printf("%s: command not found\n", tokens[0]);
     
   free_tokens(tokens);
   }
@@ -160,6 +121,8 @@ int main(int argc, char *argv[]) {
         
 
   
+
+
 
 
 
@@ -292,6 +255,80 @@ int apply_redirection(Redirection *r, bool save_for_restore){
   return 0;
 }
 
+const Builtin *find_builtin(const char *cmd, const Builtin *builtins, int count) {
+  for (int i = 0; i < count; i++) {
+    if (strcmp(cmd, builtins[i].name) == 0) {
+      return &builtins[i];
+    }
+  }
+  return NULL;
+}
 
+int echo_fn(char **tokens, Redirection *r){
+  bool save_for_restore = true;
+  if (apply_redirection(r, save_for_restore) != 0) {
+    return -1;
+  }
+  for(int i = 1; tokens[i] != NULL; i++){
+    if (i > 1) {
+      printf(" ");
+    }
+    printf("%s", tokens[i]);
+  }
+  printf("\n");
+  if(r->saved_fd != -1){
+    if (dup2(r->saved_fd, r->target_fd) == -1) {
+      perror("dup2");
+    }
+    close(r->saved_fd);
+    r->saved_fd = -1;
+  }
+  return 0;
+}
+
+int exit_fn(char **tokens, Redirection *r){
+  exit(0);
+  return 0;
+}
+
+int type_fn(char **tokens, Redirection *r){
+  if(tokens[1] == NULL){
+  return 0;
+  }
+  const Builtin *b = find_builtin(tokens[1], builtins, amount_builtins);
+  if (b != NULL) {
+    printf("%s is a shell builtin\n", tokens[1]);
+    return 0;
+  }
+  char *path = check_if_executable(tokens[1]);
+  if(path){
+    printf("%s is %s\n", tokens[1], path);
+    free(path);
+  }
+  else{
+    printf("%s: not found\n", tokens[1]);
+  }
+  return 0;
+}
+
+int pwd_fn(char **tokens, Redirection *r){
+  char cwd[1024];
+  if(getcwd(cwd, sizeof(cwd)) != NULL){
+  printf("%s\n", cwd);
+  }
+  else{
+    perror("pwd");
+  }
+  return 0;
+}
       
+int cd_fn(char **tokens, Redirection *r){
+  if(tokens[1] == NULL || strcmp(tokens[1], "~") == 0){
+    chdir(getenv("HOME"));
+  }
+  else if(tokens[1] && chdir(tokens[1]) != 0){
+    printf("cd: %s: No such file or directory\n", tokens[1]);
+  }
+  return 0;
+}
   
