@@ -331,4 +331,13 @@ int cd_fn(char **tokens, Redirection *r){
   }
   return 0;
 }
-  
+
+
+int find_pipe_index(char **tokens){
+  for(int i = 0; tokens[i] != NULL; i++){
+    if(strcmp(tokens[i], "|")==0){
+      return i;
+    }
+  }
+  return -1;
+}
