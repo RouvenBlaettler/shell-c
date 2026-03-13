@@ -11,6 +11,8 @@ char * check_if_executable(const char* cmd);
 char** tokenize_input(char* input);
 void free_tokens(char** tokens);
 int token_count(char** tokens);
+int find_pipe_index(char **tokens);
+int validate_pipe_syntax(char **tokens, int pipe_idx);
 
 
 typedef struct {
@@ -69,6 +71,10 @@ int main(int argc, char *argv[]) {
     input[strcspn(input, "\n")] = '\0';
 
     char** tokens = tokenize_input(input);
+    int pipe_idx = find_pipe_index(tokens);
+    if(validate_pipe_syntax(tokens, pipe_idx) != 0){
+      printf("Wrong pipe syntax");
+    }
     int token_amount = token_count(tokens);
     if(tokens[0]==NULL){
       free_tokens(tokens);
@@ -340,4 +346,20 @@ int find_pipe_index(char **tokens){
     }
   }
   return -1;
+}
+
+int validate_pipe_syntax(char **tokens, int pipe_idx){
+  if(pipe_idx == -1){
+    return 0;
+  }
+  if(pipe_idx == 0 || tokens[pipe_idx + 1] == NULL){
+    return -1;
+  }
+
+  for (int i = pipe_idx + 1; tokens[i] == NULL; i++){
+    if(strcmp(tokens[i], "|")==0){
+      return -1;
+    }
+  }
+  return 0;
 }
