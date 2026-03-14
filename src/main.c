@@ -73,7 +73,9 @@ int main(int argc, char *argv[]) {
     char** tokens = tokenize_input(input);
     int pipe_idx = find_pipe_index(tokens);
     if(validate_pipe_syntax(tokens, pipe_idx) != 0){
-      printf("Wrong pipe syntax");
+      printf("Wrong pipe syntax\n");
+      free_tokens(tokens);
+      continue;
     }
     int token_amount = token_count(tokens);
     if(tokens[0]==NULL){
@@ -356,7 +358,7 @@ int validate_pipe_syntax(char **tokens, int pipe_idx){
     return -1;
   }
 
-  for (int i = pipe_idx + 1; tokens[i] == NULL; i++){
+  for (int i = pipe_idx + 1; tokens[i] != NULL; i++){
     if(strcmp(tokens[i], "|")==0){
       return -1;
     }
