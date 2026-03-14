@@ -13,6 +13,7 @@ void free_tokens(char** tokens);
 int token_count(char** tokens);
 int find_pipe_index(char **tokens);
 int validate_pipe_syntax(char **tokens, int pipe_idx);
+int execute_pipe(char **tokens, int pipe_idx);
 
 
 typedef struct {
@@ -79,6 +80,12 @@ int main(int argc, char *argv[]) {
     }
     int token_amount = token_count(tokens);
     if(tokens[0]==NULL){
+      free_tokens(tokens);
+      continue;
+    }
+
+    if (pipe_idx != -1) {
+      execute_pipe(tokens, pipe_idx);
       free_tokens(tokens);
       continue;
     }
@@ -363,5 +370,87 @@ int validate_pipe_syntax(char **tokens, int pipe_idx){
       return -1;
     }
   }
+  return 0;
+}
+
+int execute_pipe(char **tokens, int pipe_idx){
+  char **left_tokens = tokens;
+  char **right_tokens = &tokens[pipe_idx + 1];
+  tokens[pipe_idx] = NULL;
+
+  char *left_path = check_if_executable(left_tokens[0]);
+  if (left_path == NULL) {
+    printf("%s: command not found\n", left_tokens[0]);
+    return -1;
+  }
+
+  char *right_path = check_if_executable(right_tokens[0]);
+  if (right_path == NULL) {
+    printf("%s: command not found\n", right_tokens[0]);
+    free(left_path);
+    return -1;
+  }
+
+  int pipe_fd[2];
+  if(pipe(pipe_fd) ==  -1){
+    perror("pipe");
+    free(left_path);
+    free(right_path);
+    return -1;
+  }
+
+  pid_t left_pid = fork();
+  if (left_pid == -1) {
+    perror("fork");
+    close(pipe_fd[0]);
+    close(pipe_fd[1]);
+    free(left_path);
+    free(right_path);
+    return -1;
+  }
+
+  if(left_pid == 0){
+    close(pipe_fd[0]);
+    if (dup2(pipe_fd[1], STDOUT_FILENO) == -1) {
+      perror("dup2");
+      _exit(1);
+    }
+    close(pipe_fd[1]);
+    execv(left_path, left_tokens);
+    perror("execv");
+    _exit(1);
+  }
+
+  pid_t right_pid = fork();
+  if (right_pid == -1) {
+    perror("fork");
+    close(pipe_fd[0]);
+    close(pipe_fd[1]);
+    waitpid(left_pid, NULL, 0);
+    free(left_path);
+    free(right_path);
+    return -1;
+  }
+
+  if(right_pid == 0){
+    close(pipe_fd[1]);
+    if (dup2(pipe_fd[0], STDIN_FILENO) == -1) {
+      perror("dup2");
+      _exit(1);
+    }
+    close(pipe_fd[0]);
+    execv(right_path, right_tokens);
+    perror("execv");
+    _exit(1);
+  }
+
+  close(pipe_fd[0]);
+  close(pipe_fd[1]);
+
+  waitpid(left_pid, NULL, 0);
+  waitpid(right_pid, NULL, 0);
+
+  free(left_path);
+  free(right_path);
   return 0;
 }
