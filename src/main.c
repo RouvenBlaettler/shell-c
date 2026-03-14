@@ -11,9 +11,7 @@ char * check_if_executable(const char* cmd);
 char** tokenize_input(char* input);
 void free_tokens(char** tokens);
 int token_count(char** tokens);
-int find_pipe_index(char **tokens);
-int validate_pipe_syntax(char **tokens, int pipe_idx);
-int execute_pipe(char **tokens, int pipe_idx);
+
 
 
 typedef struct {
@@ -40,6 +38,9 @@ int pwd_fn(char** tokens, Redirection *r);
 int parse_redirection(char **tokens, Redirection *r, int token_amount);
 int apply_redirection(Redirection *r, bool save_for_restore);
 const Builtin *find_builtin(const char *cmd, const Builtin *builtins, int count);
+int find_pipe_index(char **tokens);
+int validate_pipe_syntax(char **tokens, int pipe_idx);
+int execute_pipe(char **tokens, int pipe_idx, Redirection *r);
 
 
 Builtin builtins[] = {
@@ -85,7 +86,7 @@ int main(int argc, char *argv[]) {
     }
 
     if (pipe_idx != -1) {
-      execute_pipe(tokens, pipe_idx);
+      execute_pipe(tokens, pipe_idx, r);
       free_tokens(tokens);
       continue;
     }
@@ -373,7 +374,7 @@ int validate_pipe_syntax(char **tokens, int pipe_idx){
   return 0;
 }
 
-int execute_pipe(char **tokens, int pipe_idx){
+int execute_pipe(char **tokens, int pipe_idx, Redirection *r){
   char **left_tokens = tokens;
   char **right_tokens = &tokens[pipe_idx + 1];
   tokens[pipe_idx] = NULL;
@@ -409,7 +410,14 @@ int execute_pipe(char **tokens, int pipe_idx){
     return -1;
   }
 
+
   if(left_pid == 0){
+    const Builtin *b = find_builtin(left_tokens[0], builtins, amount_builtins);
+    if(b){
+      int rc = b->function(left_tokens, r);
+      free_tokens(left_tokens);
+      _exit(0);
+    }
     close(pipe_fd[0]);
     if (dup2(pipe_fd[1], STDOUT_FILENO) == -1) {
       perror("dup2");
@@ -433,6 +441,12 @@ int execute_pipe(char **tokens, int pipe_idx){
   }
 
   if(right_pid == 0){
+    const Builtin *b = find_builtin(right_tokens[0], builtins, amount_builtins);
+    if(b){
+      int rc = b->function(right_tokens, r);
+      free_tokens(right_tokens);
+      _exit(0);
+    }
     close(pipe_fd[1]);
     if (dup2(pipe_fd[0], STDIN_FILENO) == -1) {
       perror("dup2");
@@ -442,6 +456,7 @@ int execute_pipe(char **tokens, int pipe_idx){
     execv(right_path, right_tokens);
     perror("execv");
     _exit(1);
+  
   }
 
   close(pipe_fd[0]);
