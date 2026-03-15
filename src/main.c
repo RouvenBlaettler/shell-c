@@ -40,7 +40,7 @@ int apply_redirection(Redirection *r, bool save_for_restore);
 const Builtin *find_builtin(const char *cmd, const Builtin *builtins, int count);
 int find_pipe_index(char **tokens);
 int validate_pipe_syntax(char **tokens, int pipe_idx);
-int execute_pipe(char **tokens, int pipe_idx, Redirection *r);
+int execute_pipe(char **tokens, int pipe_idx);
 
 
 Builtin builtins[] = {
@@ -86,7 +86,7 @@ int main(int argc, char *argv[]) {
     }
 
     if (pipe_idx != -1) {
-      execute_pipe(tokens, pipe_idx, r);
+      execute_pipe(tokens, pipe_idx);
       free_tokens(tokens);
       continue;
     }
@@ -178,6 +178,7 @@ char** tokenize_input(char* input){
   for(char* token = strtok_r(input_copy, " ", &saveptr); token != NULL; token = strtok_r(NULL, " ", &saveptr)){
     tokens[count++] = strdup(token);
   }
+
   tokens[count] = NULL;
 
   free(input_copy);
@@ -374,19 +375,23 @@ int validate_pipe_syntax(char **tokens, int pipe_idx){
   return 0;
 }
 
-int execute_pipe(char **tokens, int pipe_idx, Redirection *r){
+
+
+int execute_pipe(char **tokens, int pipe_idx){
   char **left_tokens = tokens;
   char **right_tokens = &tokens[pipe_idx + 1];
   tokens[pipe_idx] = NULL;
 
+  const Builtin *left_b = find_builtin(left_tokens[0], builtins, amount_builtins);
   char *left_path = check_if_executable(left_tokens[0]);
-  if (left_path == NULL) {
+  if (left_path == NULL && !left_b) {
     printf("%s: command not found\n", left_tokens[0]);
     return -1;
   }
 
+  const Builtin *right_b = find_builtin(right_tokens[0], builtins, amount_builtins);
   char *right_path = check_if_executable(right_tokens[0]);
-  if (right_path == NULL) {
+  if (right_path == NULL && !right_b) {
     printf("%s: command not found\n", right_tokens[0]);
     free(left_path);
     return -1;
@@ -412,18 +417,19 @@ int execute_pipe(char **tokens, int pipe_idx, Redirection *r){
 
 
   if(left_pid == 0){
-    const Builtin *b = find_builtin(left_tokens[0], builtins, amount_builtins);
-    if(b){
-      int rc = b->function(left_tokens, r);
-      free_tokens(left_tokens);
-      _exit(0);
-    }
     close(pipe_fd[0]);
     if (dup2(pipe_fd[1], STDOUT_FILENO) == -1) {
       perror("dup2");
       _exit(1);
     }
     close(pipe_fd[1]);
+    
+    if(left_b){
+      Redirection no_redir = {false, 1, false, NULL, -1};
+      int rc = left_b->function(left_tokens, &no_redir);
+      _exit(rc);
+    }
+    
     execv(left_path, left_tokens);
     perror("execv");
     _exit(1);
@@ -441,22 +447,21 @@ int execute_pipe(char **tokens, int pipe_idx, Redirection *r){
   }
 
   if(right_pid == 0){
-    const Builtin *b = find_builtin(right_tokens[0], builtins, amount_builtins);
-    if(b){
-      int rc = b->function(right_tokens, r);
-      free_tokens(right_tokens);
-      _exit(0);
-    }
     close(pipe_fd[1]);
     if (dup2(pipe_fd[0], STDIN_FILENO) == -1) {
       perror("dup2");
       _exit(1);
     }
     close(pipe_fd[0]);
+    if(right_b){
+      Redirection no_redir = {false, 1, false, NULL, -1};
+      int rc = right_b->function(right_tokens, &no_redir);
+      _exit(rc);
+    }
+    
     execv(right_path, right_tokens);
     perror("execv");
     _exit(1);
-  
   }
 
   close(pipe_fd[0]);
