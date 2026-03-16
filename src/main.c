@@ -172,16 +172,55 @@ char** tokenize_input(char* input){
   char** tokens = malloc(64 * sizeof(char*));
   int count = 0;
 
-  char* input_copy = strdup(input);
-  char* saveptr = NULL;
+  char* p = input;
 
-  for(char* token = strtok_r(input_copy, " ", &saveptr); token != NULL; token = strtok_r(NULL, " ", &saveptr)){
-    tokens[count++] = strdup(token);
+  while (*p != '\0') {
+
+    while (*p == ' ' || *p == '\t') p++; //skips spaces and tabs //p++ makes that p points to next letter
+    if (*p == '\0') break;
+
+    // pipe is its own token
+    if (*p == '|') {
+      tokens[count++] = strdup("|"); //after assigning value to tokens[count] is count being increased
+      p++; //use strdup("|") instead of "|" becuase that is a string lateral, so read only but we want dynamic mutable memory from the stack
+      continue;
+    }
+
+    char buf[1024]; //stack buffer(tmp memory)
+    int len = 0;
+
+    while (*p != '\0' && *p != ' ' && *p != '\t' && *p != '|') {
+      if (*p == '\'') {
+        p++; // skip opening '
+        while (*p != '\0' && *p != '\'') {
+          buf[len++] = *p++; //copies charackter for charackter into buffer
+        }
+        if (*p == '\'') p++; // skip closing '
+      } 
+      else if (*p == '"') {
+        p++; // skip opening "
+        while (*p != '\0' && *p != '"') {
+          if (*p == '\\' && (*(p+1) == '"' || *(p+1) == '\\' || *(p+1) == '$' || *(p+1) == '\n')) { //if \ infront of special char it doesn't have special meaning anymore and the \ gets omitted
+            p++; // consume backslash, emit next char literally
+          }
+          buf[len++] = *p++;
+        }
+        if (*p == '"') p++; // skip closing "
+      } 
+      else if (*p == '\\' && *(p+1) != '\0') { //outside of quotes
+        p++; // consume backslash
+        buf[len++] = *p++; // emit next char literally
+      } 
+      else {
+        buf[len++] = *p++;
+      }
+    }
+
+    buf[len] = '\0';
+    tokens[count++] = strdup(buf);
   }
 
   tokens[count] = NULL;
-
-  free(input_copy);
   return tokens;
 }
 
