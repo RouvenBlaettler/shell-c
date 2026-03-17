@@ -408,7 +408,9 @@ int validate_pipe_syntax(char **tokens, int pipe_idx){
 
   for (int i = pipe_idx + 1; tokens[i] != NULL; i++){
     if(strcmp(tokens[i], "|")==0){
-      return -1;
+      if(tokens[i+1] != NULL && strcmp(tokens[i+1], "|")==0){
+        return -1;
+      }
     }
   }
   return 0;
@@ -513,3 +515,7 @@ int execute_pipe(char **tokens, int pipe_idx){
   free(right_path);
   return 0;
 }
+
+
+
+//in right tokens i check with find pipes, if there are more pipes in there, if there are i execute it again
