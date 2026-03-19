@@ -7,7 +7,7 @@
 #include <fcntl.h>
 
 
-char * check_if_executable(const char* cmd);
+char* check_if_executable(const char* cmd);
 char** tokenize_input(char* input);
 void free_tokens(char** tokens);
 int token_count(char** tokens);
@@ -419,103 +419,106 @@ int validate_pipe_syntax(char **tokens, int pipe_idx){
 
 
 int execute_pipe(char **tokens, int pipe_idx){
-  char **left_tokens = tokens;
-  char **right_tokens = &tokens[pipe_idx + 1];
+  char **first_tokens = tokens;
+  char **last_tokens = &tokens[pipe_idx + 1];
   tokens[pipe_idx] = NULL;
-
-  const Builtin *left_b = find_builtin(left_tokens[0], builtins, amount_builtins);
-  char *left_path = check_if_executable(left_tokens[0]);
-  if (left_path == NULL && !left_b) {
-    printf("%s: command not found\n", left_tokens[0]);
-    return -1;
+  char **all_tokens[64];
+   int i = 0;
+  all_tokens[i++] = first_tokens;
+  pipe_idx = find_pipe_index(last_tokens);
+  while(pipe_idx != -1){
+    all_tokens[i++] = last_tokens;
+    last_tokens[pipe_idx] = NULL;
+    last_tokens = &last_tokens[pipe_idx+1];
+    pipe_idx = find_pipe_index(last_tokens);
   }
+  all_tokens[i] = last_tokens;
 
-  const Builtin *right_b = find_builtin(right_tokens[0], builtins, amount_builtins);
-  char *right_path = check_if_executable(right_tokens[0]);
-  if (right_path == NULL && !right_b) {
-    printf("%s: command not found\n", right_tokens[0]);
-    free(left_path);
-    return -1;
-  }
+  int cmd_amount = i + 1; //+2 because of left tokens and right tokens
+  int pipe_amount = cmd_amount - 1;
+  int pipe_fd[64][2];
+  pid_t pids[64];
 
-  int pipe_fd[2];
-  if(pipe(pipe_fd) ==  -1){
-    perror("pipe");
-    free(left_path);
-    free(right_path);
-    return -1;
-  }
 
-  pid_t left_pid = fork();
-  if (left_pid == -1) {
-    perror("fork");
-    close(pipe_fd[0]);
-    close(pipe_fd[1]);
-    free(left_path);
-    free(right_path);
-    return -1;
+  for(int k = 0; k < pipe_amount; k++){
+    if(pipe(pipe_fd[k]) ==  -1){
+      perror("pipe");
+      return -1;
+    }
   }
 
 
-  if(left_pid == 0){
-    close(pipe_fd[0]);
-    if (dup2(pipe_fd[1], STDOUT_FILENO) == -1) {
-      perror("dup2");
+  for(int j = 0; j < cmd_amount; j++){
+    const Builtin *b = find_builtin(all_tokens[j][0], builtins, amount_builtins);
+    char *path = check_if_executable(all_tokens[j][0]);
+    if (path == NULL && !b) {
+      printf("%s: command not found\n", all_tokens[j][0]);
+      free(path);
+      return -1;
+    }
+
+    pid_t pid = fork();
+    if (pid == -1) {
+      perror("fork");
+      free(path);
+      for (int k = 0; k < pipe_amount; k++) {
+        close(pipe_fd[k][0]);
+        close(pipe_fd[k][1]);
+      }
+      for (int k = 0; k < j; k++) {
+        waitpid(pids[k], NULL, 0);
+      }
+      return -1;
+    }
+
+    if(pid == 0){
+
+      if(j == 0){
+          if (dup2(pipe_fd[j][1], STDOUT_FILENO) == -1) {
+            perror("dup2");
+            _exit(1);
+          }
+      }
+      else if(j == cmd_amount-1){
+          if (dup2(pipe_fd[j-1][0], STDIN_FILENO) == -1) {
+            perror("dup2");
+            _exit(1);
+          }
+      }
+      else{
+          if (dup2(pipe_fd[j-1][0], STDIN_FILENO) == -1 || dup2(pipe_fd[j][1], STDOUT_FILENO) == -1){
+            perror("dup2");
+            _exit(1);
+          }
+      }
+
+      for (int k = 0; k < pipe_amount; k++) {
+        close(pipe_fd[k][0]);
+        close(pipe_fd[k][1]);
+      }
+
+      if(b){
+        Redirection no_redir = {false, 1, false, NULL, -1};
+        int rc = b->function(all_tokens[j], &no_redir);
+        _exit(rc);
+      }
+      execv(path, all_tokens[j]);
+      perror("execv");
       _exit(1);
     }
-    close(pipe_fd[1]);
-    
-    if(left_b){
-      Redirection no_redir = {false, 1, false, NULL, -1};
-      int rc = left_b->function(left_tokens, &no_redir);
-      _exit(rc);
-    }
-    
-    execv(left_path, left_tokens);
-    perror("execv");
-    _exit(1);
+    pids[j] = pid;
+    free(path);
+  }
+    // parent closes all pipes here
+  for (int k = 0; k < pipe_amount; k++) {
+    close(pipe_fd[k][0]);
+    close(pipe_fd[k][1]);
   }
 
-  pid_t right_pid = fork();
-  if (right_pid == -1) {
-    perror("fork");
-    close(pipe_fd[0]);
-    close(pipe_fd[1]);
-    waitpid(left_pid, NULL, 0);
-    free(left_path);
-    free(right_path);
-    return -1;
+  // parent waits here
+  for (int j = 0; j < cmd_amount; j++) {
+    waitpid(pids[j], NULL, 0);
   }
-
-  if(right_pid == 0){
-    close(pipe_fd[1]);
-    if (dup2(pipe_fd[0], STDIN_FILENO) == -1) {
-      perror("dup2");
-      _exit(1);
-    }
-    close(pipe_fd[0]);
-    if(right_b){
-      Redirection no_redir = {false, 1, false, NULL, -1};
-      int rc = right_b->function(right_tokens, &no_redir);
-      _exit(rc);
-    }
-    
-    execv(right_path, right_tokens);
-    perror("execv");
-    _exit(1);
-  }
-
-  close(pipe_fd[0]);
-  close(pipe_fd[1]);
-
-  waitpid(left_pid, NULL, 0);
-  waitpid(right_pid, NULL, 0);
-
-  free(left_path);
-  free(right_path);
   return 0;
 }
 
-
-
-//in right tokens i check with find pipes, if there are more pipes in there, if there are i execute it again
