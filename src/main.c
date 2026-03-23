@@ -260,7 +260,9 @@ int parse_redirection(char **tokens, Redirection *r, int token_amount) {
       target_fd = 1; append = true;
     } else if (strcmp(tokens[i], "2>>") == 0) {
       target_fd = 2; append = true;
-    } else {
+    } else if (strcmp(tokens[i], "<") == 0) {
+      target_fd = 0; append = false;
+    }else {
       continue;
     }
 
@@ -285,7 +287,12 @@ int apply_redirection(Redirection *r, bool save_for_restore){
     return 0;
   }
 
-  int flags = O_WRONLY | O_CREAT | (r->append ? O_APPEND : O_TRUNC);
+  int flags;
+  if (r->target_fd == STDIN_FILENO) {
+    flags = O_RDONLY;
+  } else {
+    flags = O_WRONLY | O_CREAT | (r->append ? O_APPEND : O_TRUNC);
+  }
   int fd = open(r->file, flags, 0644);
   if (fd == -1) {
     perror("open");
