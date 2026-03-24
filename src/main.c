@@ -99,10 +99,24 @@ int main(int argc, char *argv[]) {
 
     const Builtin *b = find_builtin(tokens[0], builtins, amount_builtins);
     if (b != NULL) {
+      bool save_for_restore = true;
+      if (apply_redirection(r, save_for_restore) != 0) {
+        free_tokens(tokens);
+        continue;
+      }
       int rc = b->function(tokens, r);
-      free_tokens(tokens);
       if (rc == 1) break;   // optional exit code convention
+      if(r->saved_fd != -1){
+        if (dup2(r->saved_fd, r->target_fd) == -1) {
+          perror("dup2");
+        }
+        close(r->saved_fd);
+        r->saved_fd = -1;
+      }
+      free_tokens(tokens);
+      
       continue;
+      
     }
     
 
@@ -328,10 +342,6 @@ const Builtin *find_builtin(const char *cmd, const Builtin *builtins, int count)
 }
 
 int echo_fn(char **tokens, Redirection *r){
-  bool save_for_restore = true;
-  if (apply_redirection(r, save_for_restore) != 0) {
-    return -1;
-  }
   for(int i = 1; tokens[i] != NULL; i++){
     if (i > 1) {
       printf(" ");
@@ -339,13 +349,6 @@ int echo_fn(char **tokens, Redirection *r){
     printf("%s", tokens[i]);
   }
   printf("\n");
-  if(r->saved_fd != -1){
-    if (dup2(r->saved_fd, r->target_fd) == -1) {
-      perror("dup2");
-    }
-    close(r->saved_fd);
-    r->saved_fd = -1;
-  }
   return 0;
 }
 
