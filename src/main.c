@@ -461,8 +461,16 @@ int execute_pipe(char **tokens, int pipe_idx){
     if (path == NULL && !b) {
       printf("%s: command not found\n", all_tokens[j][0]);
       free(path);
+      for (int k = 0; k < pipe_amount; k++) {
+        close(pipe_fd[k][0]);
+        close(pipe_fd[k][1]);
+        }
+      for (int k = 0; k < j; k++) {
+        waitpid(pids[k], NULL, 0);
+      }
       return -1;
     }
+    
 
     pid_t pid = fork();
     if (pid == -1) {
