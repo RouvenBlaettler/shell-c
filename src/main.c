@@ -95,11 +95,18 @@ int main(int argc, char *argv[]) {
       free_tokens(tokens);
       continue;
     }
+
+    if (tokens[0] == NULL){   //after parse_redirection where < gets replaced with NULL a NULL-cmd could get created, e.g. > out.txt 
+      fprintf(stderr, "syntax error: missing command before redirection\n");
+      free_tokens(tokens);
+      continue;
+    }
+
     bool save_for_restore;
 
     const Builtin *b = find_builtin(tokens[0], builtins, amount_builtins);
     if (b != NULL) {
-      bool save_for_restore = true;
+      save_for_restore = true;
       if (apply_redirection(r, save_for_restore) != 0) {
         free_tokens(tokens);
         continue;
