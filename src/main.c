@@ -440,6 +440,7 @@ int execute_pipe(char **tokens, int pipe_idx){
   char **last_tokens = &tokens[pipe_idx + 1];
   tokens[pipe_idx] = NULL;
   char **all_tokens[64];
+  Redirection cmd_redirs[64];
    int i = 0;
   all_tokens[i++] = first_tokens;
   pipe_idx = find_pipe_index(last_tokens);
@@ -456,6 +457,18 @@ int execute_pipe(char **tokens, int pipe_idx){
   int pipe_fd[64][2];
   pid_t pids[64];
 
+  // Parse redirection per pipeline segment before forking.
+  for (int j = 0; j < cmd_amount; j++) {
+    int segment_token_amount = token_count(all_tokens[j]);
+    if (parse_redirection(all_tokens[j], &cmd_redirs[j], segment_token_amount) != 0) {
+      return -1;
+    }
+    if (all_tokens[j][0] == NULL) {
+      fprintf(stderr, "syntax error: missing command before redirection\n");
+      return -1;
+    }
+  }
+
 
   for(int k = 0; k < pipe_amount; k++){
     if(pipe(pipe_fd[k]) ==  -1){
@@ -470,7 +483,6 @@ int execute_pipe(char **tokens, int pipe_idx){
     char *path = check_if_executable(all_tokens[j][0]);
     if (path == NULL && !b) {
       printf("%s: command not found\n", all_tokens[j][0]);
-      free(path);
       for (int k = 0; k < pipe_amount; k++) {
         close(pipe_fd[k][0]);
         close(pipe_fd[k][1]);
@@ -478,6 +490,7 @@ int execute_pipe(char **tokens, int pipe_idx){
       for (int k = 0; k < j; k++) {
         waitpid(pids[k], NULL, 0);
       }
+      free(path);
       return -1;
     }
     
@@ -520,6 +533,10 @@ int execute_pipe(char **tokens, int pipe_idx){
       for (int k = 0; k < pipe_amount; k++) {
         close(pipe_fd[k][0]);
         close(pipe_fd[k][1]);
+      }
+
+      if (apply_redirection(&cmd_redirs[j], false) != 0) {
+        _exit(1);
       }
 
       if(b){
