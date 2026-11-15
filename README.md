@@ -1,34 +1,55 @@
-[![progress-banner](https://backend.codecrafters.io/progress/shell/cd6da845-0381-474f-add8-27f469cfea68)](https://app.codecrafters.io/users/codecrafters-bot?r=2qF)
+# shell-c
 
-This is a starting point for C solutions to the
-["Build Your Own Shell" Challenge](https://app.codecrafters.io/courses/shell/overview).
+A POSIX-style Unix shell written from scratch in C. It parses command lines, runs built-in commands and external programs, and supports pipelines, I/O redirection and shell quoting rules.
 
-In this challenge, you'll build your own POSIX compliant shell that's capable of
-interpreting shell commands, running external programs and builtin commands like
-cd, pwd, echo and more. Along the way, you'll learn about shell command parsing,
-REPLs, builtin commands, and more.
-
-**Note**: If you're viewing this repo on GitHub, head over to
-[codecrafters.io](https://codecrafters.io) to try the challenge.
-
-# Passing the first stage
-
-The entry point for your `shell` implementation is in `src/main.c`. Study and
-uncomment the relevant code, and push your changes to pass the first stage:
-
-```sh
-git commit -am "pass 1st stage" # any msg
-git push origin master
+```console
+$ echo "hello   world" | tr a-z A-Z
+HELLO   WORLD
+$ ls / | grep bin | wc -l
+4
+$ echo hi > out.txt
+$ cat < out.txt
+hi
+$ ls /nonexistent 2> errors.txt
+$ type cd
+cd is a shell builtin
 ```
 
-Time to move on to the next stage!
+## Features
 
-# Stage 2 & beyond
+- **External programs**: resolves commands via `$PATH` and runs them with `fork` + `execv`
+- **Pipelines**: any number of stages (`a | b | c`), wired together with `pipe` and `dup2`
+- **I/O redirection**: `>` / `1>`, `>>` / `1>>`, `2>`, `2>>`, `<`, also inside individual pipeline segments
+- **Quoting**: single quotes, double quotes, and backslash escaping (inside and outside double quotes)
+- **Built-ins**: `cd` (incl. `~`), `pwd`, `echo`, `type`, `exit`
 
-Note: This section is for stages 2 and beyond.
+## How it works
 
-1. Ensure you have `cmake` installed locally
-1. Run `./your_program.sh` to run your program, which is implemented in
-   `src/main.c`.
-1. Commit your changes and run `git push origin master` to submit your solution
-   to CodeCrafters. Test output will be streamed to your terminal.
+1. **Read**: a REPL reads one line of input.
+2. **Tokenize**: a hand-written tokenizer splits the line into arguments, applying quoting and escape rules and treating `|` as its own token.
+3. **Redirect**: redirection operators are parsed out of the token list; the target file is opened and the file descriptor is redirected with `dup2` (and restored afterwards for built-ins).
+4. **Execute**:
+   - built-ins run directly in the shell process (they have to, e.g. `cd` changes the shell's own working directory);
+   - external commands are found by searching each directory in `$PATH` for an executable file, then run in a child process;
+   - for pipelines, one pipe is created between each pair of stages and one child is forked per stage, with its stdin/stdout connected to the neighbouring pipes.
+
+## Build & run
+
+Requires a C compiler on Linux or macOS.
+
+```sh
+gcc -std=gnu2x src/main.c -o shell
+./shell
+```
+
+Or with CMake (also links `readline`):
+
+```sh
+cmake -B build -S .
+cmake --build build
+./build/shell
+```
+
+## Background
+
+Built while working through the [CodeCrafters "Build Your Own Shell"](https://app.codecrafters.io/courses/shell/overview) challenge, to understand processes, file descriptors and parsing at the operating-system level.
